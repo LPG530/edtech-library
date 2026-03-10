@@ -11,6 +11,7 @@ const navItems = [
   { href: "/dashboard/tools", label: "Manage Tools" },
   { href: "/dashboard/requests", label: "Requests" },
   { href: "/dashboard/rubric", label: "Rubric Builder" },
+  { href: "/dashboard/settings", label: "Settings" },
 ];
 
 export default function DashboardLayout({

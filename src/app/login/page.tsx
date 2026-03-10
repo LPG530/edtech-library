@@ -92,10 +92,16 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <div className="mt-8 pt-6 border-t border-border text-center">
+        <div className="mt-8 pt-6 border-t border-border text-center space-y-2">
+          <p className="text-sm text-muted">
+            New district?{" "}
+            <Link href="/signup" className="text-primary hover:text-primary-dark font-medium">
+              Sign up free
+            </Link>
+          </p>
           <Link
             href="/catalog"
-            className="text-sm text-primary hover:text-primary-dark"
+            className="text-sm text-primary hover:text-primary-dark block"
           >
             Browse the public catalog without signing in
           </Link>
