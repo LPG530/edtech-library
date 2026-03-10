@@ -49,26 +49,22 @@ export default function RubricBuilderPage() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    console.log("[rubric] auth user:", user?.id);
     if (!user) { setLoading(false); return; }
 
-    const { data: profile, error: profileErr } = await supabase
+    const { data: profile } = await supabase
       .from("users")
       .select("district_id")
       .eq("id", user.id)
       .single();
-    console.log("[rubric] profile:", profile, "error:", profileErr);
     if (!profile) { setLoading(false); return; }
 
     setDistrictId(profile.district_id);
 
-    const { data: templateRows, error: templateErr } = await supabase
+    const { data: templateRows } = await supabase
       .from("rubric_templates")
       .select("id, name, is_active")
       .eq("district_id", profile.district_id)
       .order("created_at");
-    console.log("[rubric] templates:", templateRows, "error:", templateErr);
-
     if (!templateRows || templateRows.length === 0) {
       setLoading(false);
       return;
