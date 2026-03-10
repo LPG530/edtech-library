@@ -95,6 +95,20 @@ export default function NewRequestPage() {
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [scores, setScores] = useState<Record<string, number>>({});
 
+  async function loadRubricForTemplate(templateId: string) {
+    const supabase = createClient();
+    const { data: cats } = await supabase
+      .from("rubric_categories")
+      .select("*, criteria:rubric_criteria(*)")
+      .eq("template_id", templateId)
+      .order("sort_order");
+
+    if (cats) {
+      setRubricCategories(parseCats(cats));
+      setScores({});
+    }
+  }
+
   useEffect(() => {
     async function loadTemplates() {
       const supabase = createClient();
@@ -127,20 +141,6 @@ export default function NewRequestPage() {
     }
     loadTemplates();
   }, []);
-
-  async function loadRubricForTemplate(templateId: string) {
-    const supabase = createClient();
-    const { data: cats } = await supabase
-      .from("rubric_categories")
-      .select("*, criteria:rubric_criteria(*)")
-      .eq("template_id", templateId)
-      .order("sort_order");
-
-    if (cats) {
-      setRubricCategories(parseCats(cats));
-      setScores({}); // Reset scores when switching templates
-    }
-  }
 
   async function handleTemplateChange(templateId: string) {
     setSelectedTemplateId(templateId);

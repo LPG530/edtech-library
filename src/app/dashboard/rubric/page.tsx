@@ -40,10 +40,6 @@ export default function RubricBuilderPage() {
   const [editingTemplateName, setEditingTemplateName] = useState(false);
   const [districtId, setDistrictId] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadTemplates();
-  }, []);
-
   async function loadTemplates() {
     const supabase = createClient();
     const {
@@ -106,6 +102,14 @@ export default function RubricBuilderPage() {
     setSelectedTemplateId(fullTemplates[0].id);
     setLoading(false);
   }
+
+  useEffect(() => {
+    async function initializeTemplates() {
+      await loadTemplates();
+    }
+
+    void initializeTemplates();
+  }, []);
 
   const selectedTemplate = templates.find((t) => t.id === selectedTemplateId);
   const categories = selectedTemplate?.categories || [];

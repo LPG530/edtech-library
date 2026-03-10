@@ -3,22 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
 import type { User, District } from "@/lib/types";
-
-type NavItem = {
-  href: string;
-  label: string;
-  adminOnly?: boolean;
-};
-
-const navItems: NavItem[] = [
-  { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/tools", label: "Manage Tools", adminOnly: true },
-  { href: "/dashboard/requests", label: "Requests" },
-  { href: "/dashboard/rubric", label: "Rubric Builder", adminOnly: true },
-  { href: "/dashboard/settings", label: "Settings", adminOnly: true },
-];
+import { createClient } from "@/lib/supabase/client";
+import { dashboardNavItems } from "@/lib/dashboard";
 
 export default function DashboardLayout({
   children,
@@ -95,8 +82,8 @@ export default function DashboardLayout({
 
       {/* Nav tabs */}
       <nav className="bg-white border-b border-border">
-        <div className="max-w-6xl mx-auto px-6 flex gap-1">
-          {navItems
+        <div className="max-w-6xl mx-auto px-6 py-3 flex gap-2 overflow-x-auto">
+          {dashboardNavItems
             .filter((item) => !item.adminOnly || user?.role === "admin")
             .map((item) => {
               const isActive =
@@ -107,11 +94,12 @@ export default function DashboardLayout({
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  className={`px-4 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                     isActive
-                      ? "border-primary text-primary"
-                      : "border-transparent text-muted hover:text-foreground"
+                      ? "bg-primary text-white"
+                      : "bg-slate-50 text-muted hover:text-foreground hover:bg-slate-100"
                   }`}
+                  title={item.description}
                 >
                   {item.label}
                 </Link>

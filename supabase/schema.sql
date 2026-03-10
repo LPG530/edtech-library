@@ -42,9 +42,39 @@ create table tools (
   category_id uuid references categories(id),
   grade_levels text[], -- e.g. {'K-2', '3-5', '6-8', '9-12'}
   subject_areas text[], -- e.g. {'Math', 'ELA', 'Science'}
+  intended_use text,
+  pricing_model text,
+  licensing_model text,
+  integration_notes text,
+  lms_integrations text[] default '{}',
+  rostering_methods text[] default '{}',
+  sso_support text not null default 'unknown' check (sso_support in ('required', 'supported', 'not_supported', 'unknown')),
+  requires_district_sso boolean not null default false,
+  accessibility_status text not null default 'review_needed' check (accessibility_status in ('review_needed', 'vpat_available', 'wcag_aa', 'partially_compliant', 'not_accessible')),
+  accessibility_notes text,
+  vpat_url text,
+  data_collected text[] default '{}',
+  data_risk_level text not null default 'medium' check (data_risk_level in ('low', 'medium', 'high')),
+  privacy_policy_url text,
+  terms_of_service_url text,
   dpa_status text check (dpa_status in ('signed', 'pending', 'not_required', 'none')),
   dpa_expiration date,
-  status text not null default 'approved' check (status in ('approved', 'under_review', 'denied', 'retired')),
+  status text not null default 'approved' check (status in ('approved', 'approved_with_restrictions', 'pilot_only', 'under_review', 'denied', 'deprecated', 'retired')),
+  allowed_roles text[] default '{}',
+  restriction_notes text,
+  teacher_guide_url text,
+  training_materials_url text,
+  district_guidance_url text,
+  implementation_notes text,
+  use_cases text[] default '{}',
+  collections text[] default '{}',
+  featured boolean not null default false,
+  next_review_date date,
+  review_cycle_months int,
+  sunset_date date,
+  replacement_tool_id uuid references tools(id),
+  last_privacy_review_at date,
+  last_terms_review_at date,
   approved_at timestamptz,
   approved_by uuid references users(id),
   notes text,
@@ -164,7 +194,7 @@ alter table review_actions enable row level security;
 -- Public catalog: anyone can read approved tools and categories
 create policy "Public can view approved tools"
   on tools for select
-  using (status = 'approved');
+  using (status in ('approved', 'approved_with_restrictions', 'pilot_only'));
 
 create policy "Public can view categories"
   on categories for select
@@ -280,6 +310,8 @@ create policy "Create review actions"
 create index idx_tools_district on tools(district_id);
 create index idx_tools_status on tools(status);
 create index idx_tools_category on tools(category_id);
+create index idx_tools_next_review on tools(next_review_date);
+create index idx_tools_risk on tools(data_risk_level);
 create index idx_tool_requests_district on tool_requests(district_id);
 create index idx_tool_requests_status on tool_requests(status);
 create index idx_users_district on users(district_id);

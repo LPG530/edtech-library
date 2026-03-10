@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { availableToolStatuses } from "@/lib/types";
 
 type ToolEntry = {
   name: string;
@@ -38,7 +39,7 @@ export default function GeneralCatalogPage() {
       const { data: allTools } = await supabase
         .from("tools")
         .select("name, vendor, description, url, grade_levels, subject_areas, district_id")
-        .eq("status", "approved")
+        .in("status", [...availableToolStatuses])
         .order("name");
 
       // Get all districts

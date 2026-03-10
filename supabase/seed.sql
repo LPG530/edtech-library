@@ -101,3 +101,73 @@ insert into tools (district_id, name, vendor, description, url, category_id, gra
   'approved',
   '2025-09-15'
 );
+
+update tools
+set
+  intended_use = 'Core LMS for assignments, announcements, lightweight grading, and classroom workflow.',
+  pricing_model = 'Included with Google Workspace for Education',
+  licensing_model = 'Districtwide',
+  integration_notes = 'Supports Classroom add-ons and common Google ecosystem workflows.',
+  lms_integrations = '{"Google Workspace"}',
+  rostering_methods = '{"Google Workspace sync"}',
+  sso_support = 'required',
+  requires_district_sso = true,
+  accessibility_status = 'vpat_available',
+  data_collected = '{"name","email","class roster","assignment submissions"}',
+  data_risk_level = 'medium',
+  privacy_policy_url = 'https://policies.google.com/privacy',
+  terms_of_service_url = 'https://workspace.google.com/terms/education_terms/',
+  allowed_roles = '{"teacher","student","admin"}',
+  teacher_guide_url = 'https://support.google.com/edu/classroom',
+  training_materials_url = 'https://edu.google.com/teaching-resources/',
+  use_cases = '{"classroom management","assignment workflow","feedback"}',
+  collections = '{"district favorites","core classroom systems"}',
+  featured = true,
+  next_review_date = '2026-08-01',
+  review_cycle_months = 12,
+  last_privacy_review_at = '2025-08-01',
+  last_terms_review_at = '2025-08-01'
+where name = 'Google Classroom';
+
+update tools
+set
+  intended_use = 'Formative assessment, checks for understanding, and review games.',
+  pricing_model = 'Freemium with premium teacher and school plans',
+  licensing_model = 'Teacher or site license',
+  lms_integrations = '{"Google Classroom","Canvas"}',
+  rostering_methods = '{"Clever","manual join code"}',
+  sso_support = 'supported',
+  accessibility_status = 'partially_compliant',
+  data_collected = '{"name","classroom responses","usage analytics"}',
+  data_risk_level = 'medium',
+  allowed_roles = '{"teacher","student"}',
+  use_cases = '{"assessment","engagement","bell ringer"}',
+  collections = '{"assessment stack"}',
+  next_review_date = '2026-09-15',
+  review_cycle_months = 12,
+  last_privacy_review_at = '2025-09-01'
+where name = 'Kahoot!';
+
+update tools
+set
+  status = 'approved_with_restrictions',
+  intended_use = 'Digital student portfolios and family communication in elementary settings.',
+  pricing_model = 'School and district subscription',
+  licensing_model = 'Site license',
+  sso_support = 'supported',
+  requires_district_sso = true,
+  accessibility_status = 'vpat_available',
+  data_collected = '{"student work","audio recordings","photos","family contact information"}',
+  data_risk_level = 'high',
+  allowed_roles = '{"teacher","student","admin"}',
+  restriction_notes = 'Family messaging and portfolio sharing should follow district communications guidance.',
+  teacher_guide_url = 'https://help.seesaw.me/hc/en-us',
+  training_materials_url = 'https://web.seesaw.me/learning',
+  district_guidance_url = 'https://example.org/district-guidance/seesaw',
+  use_cases = '{"student portfolio","family communication","reflection"}',
+  collections = '{"elementary toolkit"}',
+  next_review_date = '2026-06-15',
+  review_cycle_months = 12,
+  last_privacy_review_at = '2025-07-15',
+  last_terms_review_at = '2025-07-15'
+where name = 'Seesaw';

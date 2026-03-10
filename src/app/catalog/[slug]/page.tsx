@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, use } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import type { Tool, Category } from "@/lib/types";
+import { availableToolStatuses, type Tool, type Category } from "@/lib/types";
 
 const ALL_GRADES = ["K-2", "3-5", "6-8", "9-12"];
 
@@ -68,7 +68,7 @@ export default function DistrictCatalogPage({
           .from("tools")
           .select("*, category:categories(*)")
           .eq("district_id", district.id)
-          .eq("status", "approved")
+          .in("status", [...availableToolStatuses])
           .order("name"),
         supabase
           .from("categories")

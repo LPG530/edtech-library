@@ -26,7 +26,28 @@ export type Category = {
 };
 
 export type DpaStatus = "signed" | "pending" | "not_required" | "none";
-export type ToolStatus = "approved" | "under_review" | "denied" | "retired";
+export type ToolStatus =
+  | "approved"
+  | "approved_with_restrictions"
+  | "pilot_only"
+  | "under_review"
+  | "denied"
+  | "deprecated"
+  | "retired";
+export type AccessibilityStatus =
+  | "review_needed"
+  | "vpat_available"
+  | "wcag_aa"
+  | "partially_compliant"
+  | "not_accessible";
+export type DataRiskLevel = "low" | "medium" | "high";
+export type SsoSupport = "required" | "supported" | "not_supported" | "unknown";
+
+export const availableToolStatuses = [
+  "approved",
+  "approved_with_restrictions",
+  "pilot_only",
+] as const;
 
 export type Tool = {
   id: string;
@@ -39,9 +60,39 @@ export type Tool = {
   category_id: string | null;
   grade_levels: string[];
   subject_areas: string[];
+  intended_use: string | null;
+  pricing_model: string | null;
+  licensing_model: string | null;
+  integration_notes: string | null;
+  lms_integrations: string[];
+  rostering_methods: string[];
+  sso_support: SsoSupport;
+  requires_district_sso: boolean;
+  accessibility_status: AccessibilityStatus;
+  accessibility_notes: string | null;
+  vpat_url: string | null;
+  data_collected: string[];
+  data_risk_level: DataRiskLevel;
+  privacy_policy_url: string | null;
+  terms_of_service_url: string | null;
   dpa_status: DpaStatus;
   dpa_expiration: string | null;
   status: ToolStatus;
+  allowed_roles: string[];
+  restriction_notes: string | null;
+  teacher_guide_url: string | null;
+  training_materials_url: string | null;
+  district_guidance_url: string | null;
+  implementation_notes: string | null;
+  use_cases: string[];
+  collections: string[];
+  featured: boolean;
+  next_review_date: string | null;
+  review_cycle_months: number | null;
+  sunset_date: string | null;
+  replacement_tool_id: string | null;
+  last_privacy_review_at: string | null;
+  last_terms_review_at: string | null;
   approved_at: string | null;
   approved_by: string | null;
   notes: string | null;
