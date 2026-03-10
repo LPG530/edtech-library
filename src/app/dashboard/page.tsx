@@ -15,6 +15,7 @@ export default function DashboardPage() {
     { id: string; tool_name: string; requested_by_name: string; created_at: string; status: string }[]
   >([]);
   const [loading, setLoading] = useState(true);
+  const [userRole, setUserRole] = useState<string>("staff");
 
   useEffect(() => {
     async function load() {
@@ -24,10 +25,12 @@ export default function DashboardPage() {
 
       const { data: profile } = await supabase
         .from("users")
-        .select("district_id")
+        .select("district_id, role")
         .eq("id", user.id)
         .single();
       if (!profile) return;
+
+      setUserRole(profile.role);
 
       const districtId = profile.district_id;
 
@@ -176,18 +179,29 @@ export default function DashboardPage() {
 
       {/* Quick links */}
       <div className="mt-6 flex gap-4">
-        <Link
-          href="/dashboard/requests"
-          className="px-4 py-2 bg-primary text-white text-sm rounded-lg font-medium hover:bg-primary-dark transition-colors"
-        >
-          Review Pending Requests
-        </Link>
-        <Link
-          href="/dashboard/tools"
-          className="px-4 py-2 border border-border text-sm rounded-lg font-medium hover:bg-gray-50 transition-colors"
-        >
-          Manage Tools
-        </Link>
+        {userRole === "staff" ? (
+          <Link
+            href="/dashboard/requests/new"
+            className="px-4 py-2 bg-primary text-white text-sm rounded-lg font-medium hover:bg-primary-dark transition-colors"
+          >
+            + New Request
+          </Link>
+        ) : (
+          <>
+            <Link
+              href="/dashboard/requests"
+              className="px-4 py-2 bg-primary text-white text-sm rounded-lg font-medium hover:bg-primary-dark transition-colors"
+            >
+              Review Pending Requests
+            </Link>
+            <Link
+              href="/dashboard/tools"
+              className="px-4 py-2 border border-border text-sm rounded-lg font-medium hover:bg-gray-50 transition-colors"
+            >
+              Manage Tools
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );
