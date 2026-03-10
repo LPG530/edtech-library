@@ -6,12 +6,18 @@ import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { User, District } from "@/lib/types";
 
-const navItems = [
+type NavItem = {
+  href: string;
+  label: string;
+  adminOnly?: boolean;
+};
+
+const navItems: NavItem[] = [
   { href: "/dashboard", label: "Overview" },
-  { href: "/dashboard/tools", label: "Manage Tools" },
+  { href: "/dashboard/tools", label: "Manage Tools", adminOnly: true },
   { href: "/dashboard/requests", label: "Requests" },
-  { href: "/dashboard/rubric", label: "Rubric Builder" },
-  { href: "/dashboard/settings", label: "Settings" },
+  { href: "/dashboard/rubric", label: "Rubric Builder", adminOnly: true },
+  { href: "/dashboard/settings", label: "Settings", adminOnly: true },
 ];
 
 export default function DashboardLayout({
@@ -90,25 +96,27 @@ export default function DashboardLayout({
       {/* Nav tabs */}
       <nav className="bg-white border-b border-border">
         <div className="max-w-6xl mx-auto px-6 flex gap-1">
-          {navItems.map((item) => {
-            const isActive =
-              item.href === "/dashboard"
-                ? pathname === "/dashboard"
-                : pathname.startsWith(item.href);
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                  isActive
-                    ? "border-primary text-primary"
-                    : "border-transparent text-muted hover:text-foreground"
-                }`}
-              >
-                {item.label}
-              </Link>
-            );
-          })}
+          {navItems
+            .filter((item) => !item.adminOnly || user?.role === "admin")
+            .map((item) => {
+              const isActive =
+                item.href === "/dashboard"
+                  ? pathname === "/dashboard"
+                  : pathname.startsWith(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                    isActive
+                      ? "border-primary text-primary"
+                      : "border-transparent text-muted hover:text-foreground"
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
         </div>
       </nav>
 

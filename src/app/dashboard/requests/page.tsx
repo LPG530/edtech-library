@@ -27,6 +27,7 @@ export default function RequestsPage() {
   >([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
+  const [userRole, setUserRole] = useState<string>("staff");
 
   useEffect(() => {
     async function load() {
@@ -36,16 +37,25 @@ export default function RequestsPage() {
 
       const { data: profile } = await supabase
         .from("users")
-        .select("district_id")
+        .select("district_id, role")
         .eq("id", user.id)
         .single();
       if (!profile) return;
 
-      const { data } = await supabase
+      setUserRole(profile.role);
+
+      let query = supabase
         .from("tool_requests")
         .select("*, requester:users!tool_requests_requested_by_fkey(full_name)")
         .eq("district_id", profile.district_id)
         .order("created_at", { ascending: false });
+
+      // Staff only see their own requests
+      if (profile.role === "staff") {
+        query = query.eq("requested_by", user.id);
+      }
+
+      const { data } = await query;
 
       if (data) setRequests(data);
       setLoading(false);
@@ -199,40 +209,42 @@ export default function RequestsPage() {
               </div>
             )}
 
-            <div className="flex gap-2">
-              {req.status === "submitted" && (
-                <>
-                  <button
-                    onClick={() => updateStatus(req.id, "in_review")}
-                    className="px-3 py-1.5 bg-primary text-white text-sm rounded-lg font-medium hover:bg-primary-dark transition-colors"
-                  >
-                    Start Review
-                  </button>
-                  <button
-                    onClick={() => updateStatus(req.id, "more_info_needed")}
-                    className="px-3 py-1.5 border border-border text-sm rounded-lg font-medium hover:bg-gray-50 transition-colors"
-                  >
-                    Request More Info
-                  </button>
-                </>
-              )}
-              {req.status === "in_review" && (
-                <>
-                  <button
-                    onClick={() => approveAndAddTool(req)}
-                    className="px-3 py-1.5 bg-success text-white text-sm rounded-lg font-medium hover:opacity-90 transition-colors"
-                  >
-                    Approve
-                  </button>
-                  <button
-                    onClick={() => updateStatus(req.id, "denied")}
-                    className="px-3 py-1.5 bg-danger text-white text-sm rounded-lg font-medium hover:opacity-90 transition-colors"
-                  >
-                    Deny
-                  </button>
-                </>
-              )}
-            </div>
+            {userRole !== "staff" && (
+              <div className="flex gap-2">
+                {req.status === "submitted" && (
+                  <>
+                    <button
+                      onClick={() => updateStatus(req.id, "in_review")}
+                      className="px-3 py-1.5 bg-primary text-white text-sm rounded-lg font-medium hover:bg-primary-dark transition-colors"
+                    >
+                      Start Review
+                    </button>
+                    <button
+                      onClick={() => updateStatus(req.id, "more_info_needed")}
+                      className="px-3 py-1.5 border border-border text-sm rounded-lg font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Request More Info
+                    </button>
+                  </>
+                )}
+                {req.status === "in_review" && (
+                  <>
+                    <button
+                      onClick={() => approveAndAddTool(req)}
+                      className="px-3 py-1.5 bg-success text-white text-sm rounded-lg font-medium hover:opacity-90 transition-colors"
+                    >
+                      Approve
+                    </button>
+                    <button
+                      onClick={() => updateStatus(req.id, "denied")}
+                      className="px-3 py-1.5 bg-danger text-white text-sm rounded-lg font-medium hover:opacity-90 transition-colors"
+                    >
+                      Deny
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         ))}
 
