@@ -242,6 +242,50 @@ export default function RubricBuilderPage() {
     setSelectedTemplateId(templates.find((t) => t.id !== selectedTemplateId)?.id || null);
   }
 
+  function handleExportCsv() {
+    if (!selectedTemplate) return;
+
+    const scoreTypeLabel: Record<string, string> = {
+      scale: "Scale (1-4)",
+      yes_no: "Yes / No",
+      met_partial_not: "Met / Partial / Not Met",
+    };
+
+    const rows: string[][] = [
+      ["Category", "Weight (%)", "Criterion", "Description", "Score Type"],
+    ];
+
+    for (const cat of categories) {
+      if (cat.criteria.length === 0) {
+        rows.push([cat.name, String(cat.weight), "", "", ""]);
+      } else {
+        for (const cr of cat.criteria) {
+          rows.push([
+            cat.name,
+            String(cat.weight),
+            cr.prompt,
+            cr.description,
+            scoreTypeLabel[cr.score_type] || cr.score_type,
+          ]);
+        }
+      }
+    }
+
+    const csvContent = rows
+      .map((row) =>
+        row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")
+      )
+      .join("\n");
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${selectedTemplate.name.replace(/[^a-zA-Z0-9]/g, "_")}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function handleSave() {
     if (!selectedTemplateId || !selectedTemplate) return;
     setSaving(true);
@@ -317,6 +361,12 @@ export default function RubricBuilderPage() {
           {saved && (
             <span className="text-sm text-success font-medium">Saved</span>
           )}
+          <button
+            onClick={handleExportCsv}
+            className="px-4 py-2 border border-border text-sm rounded-lg font-medium hover:bg-gray-50 transition-colors"
+          >
+            Export CSV
+          </button>
           <button
             onClick={handleSave}
             disabled={saving}
