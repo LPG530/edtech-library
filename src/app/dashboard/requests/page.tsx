@@ -106,6 +106,7 @@ export default function RequestsPage() {
     // Add tool to catalog
     await supabase.from("tools").insert({
       district_id: request.district_id,
+      global_tool_id: request.global_tool_id,
       name: request.tool_name,
       vendor: request.vendor,
       description: request.description,
@@ -117,6 +118,12 @@ export default function RequestsPage() {
       approved_at: new Date().toISOString(),
       approved_by: user?.id,
     });
+
+    if (request.global_tool_id) {
+      await supabase.rpc("register_global_tool_adoption", {
+        p_global_tool_id: request.global_tool_id,
+      });
+    }
   }
 
   const filtered =

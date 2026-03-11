@@ -1,19 +1,23 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { availableToolStatuses } from "@/lib/types";
+import { availableToolStatuses, type GlobalTool } from "@/lib/types";
 
-type ToolEntry = {
-  name: string;
-  vendor: string | null;
-  description: string | null;
-  url: string | null;
-  grade_levels: string[];
-  subject_areas: string[];
-  district_count: number;
-};
+type ToolEntry = Pick<
+  GlobalTool,
+  | "id"
+  | "canonical_name"
+  | "vendor"
+  | "description"
+  | "website_url"
+  | "grade_levels"
+  | "subject_areas"
+  | "request_count"
+  | "district_adoption_count"
+  | "source"
+>;
 
 type DistrictEntry = {
   name: string;
@@ -35,67 +39,40 @@ export default function GeneralCatalogPage() {
     async function fetchData() {
       const supabase = createClient();
 
-      // Get all approved tools across all districts
-      const { data: allTools } = await supabase
-        .from("tools")
-        .select("name, vendor, description, url, grade_levels, subject_areas, district_id")
-        .in("status", [...availableToolStatuses])
-        .order("name");
+      const [{ data: allTools }, { data: allDistricts }, { data: districtTools }] =
+        await Promise.all([
+          supabase
+            .from("global_tools")
+            .select(
+              "id, canonical_name, vendor, description, website_url, grade_levels, subject_areas, request_count, district_adoption_count, source"
+            )
+            .order("canonical_name"),
+          supabase.from("districts").select("name, slug, id").order("name"),
+          supabase
+            .from("tools")
+            .select("district_id")
+            .in("status", [...availableToolStatuses]),
+        ]);
 
-      // Get all districts
-      const { data: allDistricts } = await supabase
-        .from("districts")
-        .select("name, slug, id")
-        .order("name");
+      if (allTools) {
+        setTools(allTools as ToolEntry[]);
+      }
 
-      if (allTools && allDistricts) {
-        // Deduplicate tools by name, count how many districts use each
-        const toolMap = new Map<string, ToolEntry>();
-        for (const t of allTools) {
-          const key = t.name.toLowerCase();
-          if (toolMap.has(key)) {
-            const existing = toolMap.get(key)!;
-            existing.district_count++;
-            // Merge grade levels
-            for (const g of t.grade_levels || []) {
-              if (!existing.grade_levels.includes(g)) {
-                existing.grade_levels.push(g);
-              }
-            }
-            // Merge subject areas
-            for (const s of t.subject_areas || []) {
-              if (!existing.subject_areas.includes(s)) {
-                existing.subject_areas.push(s);
-              }
-            }
-          } else {
-            toolMap.set(key, {
-              name: t.name,
-              vendor: t.vendor,
-              description: t.description,
-              url: t.url,
-              grade_levels: [...(t.grade_levels || [])],
-              subject_areas: [...(t.subject_areas || [])],
-              district_count: 1,
-            });
-          }
-        }
-        setTools(Array.from(toolMap.values()));
-
-        // Count tools per district
+      if (allDistricts) {
         const districtToolCounts = new Map<string, number>();
-        for (const t of allTools) {
+        for (const tool of districtTools || []) {
+          const districtId = tool.district_id as string;
           districtToolCounts.set(
-            t.district_id,
-            (districtToolCounts.get(t.district_id) || 0) + 1
+            districtId,
+            (districtToolCounts.get(districtId) || 0) + 1
           );
         }
 
         setDistricts(
-          allDistricts.map((d) => ({
-            name: d.name,
-            slug: d.slug,
-            tool_count: districtToolCounts.get(d.id) || 0,
+          allDistricts.map((district) => ({
+            name: district.name as string,
+            slug: district.slug as string,
+            tool_count: districtToolCounts.get(district.id as string) || 0,
           }))
         );
       }
@@ -103,14 +80,14 @@ export default function GeneralCatalogPage() {
       setLoading(false);
     }
 
-    fetchData();
+    void fetchData();
   }, []);
 
   const filteredTools = useMemo(() => {
     return tools.filter((tool) => {
       const matchesSearch =
         search === "" ||
-        tool.name.toLowerCase().includes(search.toLowerCase()) ||
+        tool.canonical_name.toLowerCase().includes(search.toLowerCase()) ||
         tool.vendor?.toLowerCase().includes(search.toLowerCase()) ||
         tool.description?.toLowerCase().includes(search.toLowerCase());
 
@@ -123,14 +100,13 @@ export default function GeneralCatalogPage() {
 
   const filteredDistricts = useMemo(() => {
     if (search === "") return districts;
-    return districts.filter((d) =>
-      d.name.toLowerCase().includes(search.toLowerCase())
+    return districts.filter((district) =>
+      district.name.toLowerCase().includes(search.toLowerCase())
     );
   }, [districts, search]);
 
   return (
     <div className="min-h-screen">
-      {/* Header */}
       <header className="bg-white border-b border-border sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold text-foreground">
@@ -151,12 +127,11 @@ export default function GeneralCatalogPage() {
         <div className="mb-8">
           <h1 className="text-2xl font-bold mb-2">EdTech Tool Directory</h1>
           <p className="text-sm text-muted">
-            Browse edtech tools used by school districts, or find your
-            district&apos;s approved catalog.
+            Browse the shared edtech library contributed by districts everywhere,
+            or open a district-specific approved catalog.
           </p>
         </div>
 
-        {/* Tabs */}
         <div className="flex gap-2 mb-6">
           <button
             onClick={() => setTab("districts")}
@@ -176,11 +151,10 @@ export default function GeneralCatalogPage() {
                 : "bg-white border border-border text-muted hover:text-foreground"
             }`}
           >
-            All EdTech Tools
+            Global Tool Library
           </button>
         </div>
 
-        {/* Search */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8">
           <div className="flex-1">
             <input
@@ -188,7 +162,7 @@ export default function GeneralCatalogPage() {
               placeholder={
                 tab === "districts"
                   ? "Search for your district..."
-                  : "Search tools by name, vendor, or description..."
+                  : "Search the global library by name, vendor, or description..."
               }
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -217,7 +191,6 @@ export default function GeneralCatalogPage() {
           </div>
         )}
 
-        {/* Districts tab */}
         {!loading && tab === "districts" && (
           <>
             <p className="text-sm text-muted mb-4">
@@ -259,29 +232,33 @@ export default function GeneralCatalogPage() {
           </>
         )}
 
-        {/* Tools tab */}
         {!loading && tab === "tools" && (
           <>
             <p className="text-sm text-muted mb-4">
               {filteredTools.length} tool
-              {filteredTools.length !== 1 ? "s" : ""} across all districts
+              {filteredTools.length !== 1 ? "s" : ""} in the shared library
             </p>
 
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
               {filteredTools.map((tool) => (
                 <div
-                  key={tool.name}
+                  key={tool.id}
                   className="bg-white border border-border rounded-xl p-5 hover:shadow-md transition-shadow"
                 >
                   <div className="mb-3">
-                    <h3 className="font-semibold text-foreground">
-                      {tool.name}
-                    </h3>
-                    <p className="text-sm text-muted">{tool.vendor}</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="font-semibold text-foreground">
+                        {tool.canonical_name}
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-[11px] font-medium capitalize">
+                        {tool.source.replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    <p className="text-sm text-muted">{tool.vendor || "Unknown vendor"}</p>
                   </div>
 
                   <p className="text-sm text-muted mb-4 line-clamp-2">
-                    {tool.description}
+                    {tool.description || "No description yet. This tool entered the library through community or district activity."}
                   </p>
 
                   <div className="flex flex-wrap gap-1.5 mb-3">
@@ -308,20 +285,25 @@ export default function GeneralCatalogPage() {
 
                   <div className="flex items-center justify-between pt-3 border-t border-border">
                     <span className="text-xs text-muted">
-                      Used by {tool.district_count} district
-                      {tool.district_count !== 1 ? "s" : ""}
+                      {tool.district_adoption_count} district
+                      {tool.district_adoption_count !== 1 ? "s" : ""} using it
                     </span>
-                    {tool.url && (
-                      <a
-                        href={tool.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-primary hover:text-primary-dark font-medium"
-                      >
-                        Visit site
-                      </a>
-                    )}
+                    <span className="text-xs text-muted">
+                      {tool.request_count} request
+                      {tool.request_count !== 1 ? "s" : ""}
+                    </span>
                   </div>
+
+                  {tool.website_url && (
+                    <a
+                      href={tool.website_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-primary hover:text-primary-dark font-medium inline-block mt-3"
+                    >
+                      Visit site
+                    </a>
+                  )}
                 </div>
               ))}
             </div>

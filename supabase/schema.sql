@@ -30,10 +30,38 @@ create table categories (
   sort_order int default 0
 );
 
+-- Shared global edtech catalog
+create table global_tools (
+  id uuid primary key default gen_random_uuid(),
+  canonical_name text not null,
+  vendor text,
+  description text,
+  website_url text,
+  logo_url text,
+  grade_levels text[] default '{}',
+  subject_areas text[] default '{}',
+  use_cases text[] default '{}',
+  pricing_model text,
+  licensing_model text,
+  lms_integrations text[] default '{}',
+  rostering_methods text[] default '{}',
+  data_collected text[] default '{}',
+  accessibility_status text not null default 'review_needed' check (accessibility_status in ('review_needed', 'vpat_available', 'wcag_aa', 'partially_compliant', 'not_accessible')),
+  privacy_policy_url text,
+  terms_of_service_url text,
+  source text not null default 'community' check (source in ('seeded', 'community', 'district_request')),
+  request_count int not null default 0,
+  district_adoption_count int not null default 0,
+  last_requested_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- Approved edtech tools (the catalog)
 create table tools (
   id uuid primary key default gen_random_uuid(),
   district_id uuid references districts(id) not null,
+  global_tool_id uuid references global_tools(id),
   name text not null,
   vendor text,
   description text,
@@ -125,6 +153,7 @@ create table rubric_criteria (
 create table tool_requests (
   id uuid primary key default gen_random_uuid(),
   district_id uuid references districts(id) not null,
+  global_tool_id uuid references global_tools(id),
   requested_by uuid references users(id) not null,
   tool_name text not null,
   vendor text,
@@ -182,6 +211,7 @@ create table review_actions (
 alter table districts enable row level security;
 alter table users enable row level security;
 alter table categories enable row level security;
+alter table global_tools enable row level security;
 alter table tools enable row level security;
 alter table rubric_templates enable row level security;
 alter table rubric_categories enable row level security;
@@ -190,6 +220,10 @@ alter table tool_requests enable row level security;
 alter table rubric_evaluations enable row level security;
 alter table rubric_scores enable row level security;
 alter table review_actions enable row level security;
+
+create policy "Public can view global tools"
+  on global_tools for select
+  using (true);
 
 -- Public catalog: anyone can read approved tools and categories
 create policy "Public can view approved tools"
@@ -310,10 +344,14 @@ create policy "Create review actions"
 create index idx_tools_district on tools(district_id);
 create index idx_tools_status on tools(status);
 create index idx_tools_category on tools(category_id);
+create index idx_tools_global on tools(global_tool_id);
 create index idx_tools_next_review on tools(next_review_date);
 create index idx_tools_risk on tools(data_risk_level);
+create index idx_global_tools_name on global_tools(lower(canonical_name));
+create unique index idx_global_tools_unique_name_vendor on global_tools(lower(canonical_name), coalesce(lower(vendor), ''));
 create index idx_tool_requests_district on tool_requests(district_id);
 create index idx_tool_requests_status on tool_requests(status);
+create index idx_tool_requests_global on tool_requests(global_tool_id);
 create index idx_users_district on users(district_id);
 create index idx_rubric_evaluations_request on rubric_evaluations(request_id);
 create index idx_review_actions_request on review_actions(request_id);
@@ -394,6 +432,96 @@ begin
   return NEW;
 end;
 $$ language plpgsql;
+
+create or replace function upsert_global_tool(
+  p_name text,
+  p_vendor text default null,
+  p_website_url text default null,
+  p_description text default null,
+  p_grade_levels text[] default '{}',
+  p_subject_areas text[] default '{}'
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  existing_id uuid;
+begin
+  select id into existing_id
+  from global_tools
+  where lower(canonical_name) = lower(trim(p_name))
+    and coalesce(lower(vendor), '') = coalesce(lower(trim(p_vendor)), '')
+  limit 1;
+
+  if existing_id is null then
+    insert into global_tools (
+      canonical_name,
+      vendor,
+      website_url,
+      description,
+      grade_levels,
+      subject_areas,
+      source,
+      request_count,
+      district_adoption_count,
+      last_requested_at
+    )
+    values (
+      trim(p_name),
+      nullif(trim(p_vendor), ''),
+      nullif(trim(p_website_url), ''),
+      nullif(trim(p_description), ''),
+      coalesce(p_grade_levels, '{}'),
+      coalesce(p_subject_areas, '{}'),
+      'district_request',
+      1,
+      0,
+      now()
+    )
+    returning id into existing_id;
+  else
+    update global_tools
+    set
+      description = coalesce(global_tools.description, nullif(trim(p_description), '')),
+      website_url = coalesce(global_tools.website_url, nullif(trim(p_website_url), '')),
+      grade_levels = (
+        select coalesce(array_agg(distinct value), '{}')
+        from unnest(coalesce(global_tools.grade_levels, '{}') || coalesce(p_grade_levels, '{}')) value
+      ),
+      subject_areas = (
+        select coalesce(array_agg(distinct value), '{}')
+        from unnest(coalesce(global_tools.subject_areas, '{}') || coalesce(p_subject_areas, '{}')) value
+      ),
+      request_count = global_tools.request_count + 1,
+      last_requested_at = now(),
+      updated_at = now()
+    where id = existing_id;
+  end if;
+
+  return existing_id;
+end;
+$$;
+
+create or replace function register_global_tool_adoption(p_global_tool_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if p_global_tool_id is null then
+    return;
+  end if;
+
+  update global_tools
+  set
+    district_adoption_count = district_adoption_count + 1,
+    updated_at = now()
+  where id = p_global_tool_id;
+end;
+$$;
 
 create trigger on_district_created
   after insert on districts

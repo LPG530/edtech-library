@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import type { GlobalTool } from "@/lib/types";
 
 const GRADE_OPTIONS = ["K-2", "3-5", "6-8", "9-12"];
 const SUBJECT_OPTIONS = [
@@ -49,6 +50,19 @@ type TemplateOption = {
   name: string;
 };
 
+type GlobalToolOption = Pick<
+  GlobalTool,
+  | "id"
+  | "canonical_name"
+  | "vendor"
+  | "description"
+  | "website_url"
+  | "grade_levels"
+  | "subject_areas"
+  | "district_adoption_count"
+  | "request_count"
+>;
+
 function parseCats(cats: Record<string, unknown>[]): RubricCategoryWithCriteria[] {
   return cats.map((c) => ({
     id: c.id as string,
@@ -79,6 +93,10 @@ export default function NewRequestPage() {
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [rubricCategories, setRubricCategories] = useState<RubricCategoryWithCriteria[]>([]);
   const [districtId, setDistrictId] = useState<string | null>(null);
+  const [globalTools, setGlobalTools] = useState<GlobalToolOption[]>([]);
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [selectedGlobalTool, setSelectedGlobalTool] =
+    useState<GlobalToolOption | null>(null);
 
   // Form state
   const [form, setForm] = useState({
@@ -131,10 +149,23 @@ export default function NewRequestPage() {
         .eq("is_active", true)
         .order("created_at");
 
+      const { data: globalToolRows } = await supabase
+        .from("global_tools")
+        .select(
+          "id, canonical_name, vendor, description, website_url, grade_levels, subject_areas, district_adoption_count, request_count"
+        )
+        .order("district_adoption_count", { ascending: false })
+        .order("request_count", { ascending: false })
+        .limit(150);
+
       if (templateRows && templateRows.length > 0) {
         setTemplates(templateRows);
         setSelectedTemplateId(templateRows[0].id);
         await loadRubricForTemplate(templateRows[0].id);
+      }
+
+      if (globalToolRows) {
+        setGlobalTools(globalToolRows as GlobalToolOption[]);
       }
 
       setLoading(false);
@@ -165,6 +196,36 @@ export default function NewRequestPage() {
 
   const totalCriteria = rubricCategories.flatMap((c) => c.criteria).length;
   const scoredCriteria = Object.keys(scores).length;
+  const filteredGlobalTools = globalTools
+    .filter((tool) => {
+      if (globalSearch.trim() === "") return true;
+      const query = globalSearch.toLowerCase();
+      return (
+        tool.canonical_name.toLowerCase().includes(query) ||
+        tool.vendor?.toLowerCase().includes(query) ||
+        tool.description?.toLowerCase().includes(query)
+      );
+    })
+    .slice(0, globalSearch.trim() === "" ? 8 : 6);
+
+  function selectGlobalTool(tool: GlobalToolOption) {
+    setSelectedGlobalTool(tool);
+    setGlobalSearch(tool.canonical_name);
+    setForm((current) => ({
+      ...current,
+      tool_name: tool.canonical_name,
+      vendor: tool.vendor || "",
+      url: tool.website_url || "",
+      description: tool.description || current.description,
+    }));
+    setSelectedGrades(tool.grade_levels || []);
+    setSelectedSubjects(tool.subject_areas || []);
+  }
+
+  function clearGlobalToolSelection() {
+    setSelectedGlobalTool(null);
+    setGlobalSearch("");
+  }
 
   const weightedScore = rubricCategories.reduce((total, category) => {
     const categoryMax = category.criteria.length * 4;
@@ -182,13 +243,40 @@ export default function NewRequestPage() {
 
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    if (!user) {
+      setSubmitting(false);
+      return;
+    }
+
+    let globalToolId = selectedGlobalTool?.id || null;
+    let globalToolError: { message?: string } | null = null;
+
+    if (!globalToolId) {
+      const response = await supabase.rpc("upsert_global_tool", {
+        p_name: form.tool_name,
+        p_vendor: form.vendor || null,
+        p_website_url: form.url || null,
+        p_description: form.description || null,
+        p_grade_levels: selectedGrades,
+        p_subject_areas: selectedSubjects,
+      });
+
+      globalToolId = response.data;
+      globalToolError = response.error;
+    }
+
+    if (globalToolError || !globalToolId) {
+      console.error("Error linking global tool:", globalToolError);
+      setSubmitting(false);
+      return;
+    }
 
     // Create the request
     const { data: request, error } = await supabase
       .from("tool_requests")
       .insert({
         district_id: districtId,
+        global_tool_id: globalToolId,
         requested_by: user.id,
         tool_name: form.tool_name,
         vendor: form.vendor || null,
@@ -266,6 +354,11 @@ export default function NewRequestPage() {
           &larr; Back to Requests
         </Link>
         <h1 className="text-2xl font-bold mt-2">Request a New Tool</h1>
+        <p className="text-sm text-muted mt-2">
+          Search the shared library first. If the tool already exists, select it
+          and request it for your district. If not, your request will create a
+          new shared entry.
+        </p>
       </div>
 
       {/* Step indicator */}
@@ -301,6 +394,86 @@ export default function NewRequestPage() {
         <div className="bg-white border border-border rounded-xl p-6">
           <h2 className="text-lg font-semibold mb-4">Tool Information</h2>
           <div className="space-y-4">
+            <div className="rounded-xl border border-blue-200 bg-blue-50 p-4">
+              <label className="block text-sm font-medium mb-2">
+                Search the shared library first
+              </label>
+              <input
+                type="text"
+                value={globalSearch}
+                onChange={(e) => {
+                  setGlobalSearch(e.target.value);
+                  if (selectedGlobalTool) {
+                    setSelectedGlobalTool(null);
+                  }
+                }}
+                className="w-full px-3 py-2 border border-blue-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                placeholder="Search by tool name or vendor..."
+              />
+              <p className="text-xs text-blue-800 mt-2">
+                Choosing an existing tool reduces duplicates and preserves shared
+                metadata across districts.
+              </p>
+
+              <div className="mt-3 space-y-2">
+                {filteredGlobalTools.map((tool) => (
+                  <button
+                    key={tool.id}
+                    type="button"
+                    onClick={() => selectGlobalTool(tool)}
+                    className={`w-full text-left rounded-lg border px-3 py-3 transition-colors ${
+                      selectedGlobalTool?.id === tool.id
+                        ? "border-primary bg-white"
+                        : "border-blue-100 bg-white/80 hover:border-blue-300"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">
+                          {tool.canonical_name}
+                        </p>
+                        <p className="text-xs text-muted mt-1">
+                          {tool.vendor || "Unknown vendor"}
+                        </p>
+                      </div>
+                      <div className="text-right text-xs text-muted">
+                        <p>{tool.district_adoption_count} districts</p>
+                        <p>{tool.request_count} requests</p>
+                      </div>
+                    </div>
+                    {tool.description && (
+                      <p className="text-xs text-muted mt-2 line-clamp-2">
+                        {tool.description}
+                      </p>
+                    )}
+                  </button>
+                ))}
+              </div>
+
+              {selectedGlobalTool ? (
+                <div className="mt-3 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+                  <p className="text-sm text-emerald-900">
+                    Requesting existing library entry:{" "}
+                    <span className="font-medium">
+                      {selectedGlobalTool.canonical_name}
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={clearGlobalToolSelection}
+                    className="text-sm font-medium text-emerald-900"
+                  >
+                    Clear
+                  </button>
+                </div>
+              ) : (
+                <p className="text-xs text-muted mt-3">
+                  Don&apos;t see it? Continue below and your submission will add
+                  a new entry to the shared library.
+                </p>
+              )}
+            </div>
+
             <div>
               <label className="block text-sm font-medium mb-1">
                 Tool Name *
@@ -570,6 +743,11 @@ export default function NewRequestPage() {
           <div className="space-y-4 mb-6">
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm font-medium mb-2">{form.tool_name}</p>
+              <p className="text-xs text-muted mb-2">
+                {selectedGlobalTool
+                  ? "Based on an existing shared library entry"
+                  : "Will create a new shared library entry if no match exists"}
+              </p>
               <p className="text-xs text-muted">{form.justification}</p>
             </div>
 

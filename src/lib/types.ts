@@ -25,6 +25,32 @@ export type Category = {
   sort_order: number;
 };
 
+export type GlobalTool = {
+  id: string;
+  canonical_name: string;
+  vendor: string | null;
+  description: string | null;
+  website_url: string | null;
+  logo_url: string | null;
+  grade_levels: string[];
+  subject_areas: string[];
+  use_cases: string[];
+  pricing_model: string | null;
+  licensing_model: string | null;
+  lms_integrations: string[];
+  rostering_methods: string[];
+  data_collected: string[];
+  accessibility_status: AccessibilityStatus;
+  privacy_policy_url: string | null;
+  terms_of_service_url: string | null;
+  source: "seeded" | "community" | "district_request";
+  request_count: number;
+  district_adoption_count: number;
+  last_requested_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type DpaStatus = "signed" | "pending" | "not_required" | "none";
 export type ToolStatus =
   | "approved"
@@ -52,6 +78,7 @@ export const availableToolStatuses = [
 export type Tool = {
   id: string;
   district_id: string;
+  global_tool_id: string | null;
   name: string;
   vendor: string | null;
   description: string | null;
@@ -143,6 +170,7 @@ export type RequestStatus =
 export type ToolRequest = {
   id: string;
   district_id: string;
+  global_tool_id: string | null;
   requested_by: string;
   tool_name: string;
   vendor: string | null;
